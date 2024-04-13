@@ -1,20 +1,44 @@
-﻿Imports System.Text.RegularExpressions
-
+﻿Imports System.Net.NetworkInformation
+Imports System.Text.RegularExpressions
+Imports QRCoder
 Public Class Form1
+
+    Private Function IsConnectedToWifi() As Boolean
+        Dim interfaces As NetworkInterface() = NetworkInterface.GetAllNetworkInterfaces()
+
+        For Each iface As NetworkInterface In interfaces
+            If iface.NetworkInterfaceType = NetworkInterfaceType.Wireless80211 AndAlso iface.OperationalStatus = OperationalStatus.Up Then
+                Return True
+            End If
+        Next
+
+        Return False
+    End Function
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        ' Run the netsh command and populate ListBox with profile names
-        PopulateProfileList()
-    End Sub
+        MessageBox.Show("This App will show your own wifi password" & vbCrLf & "It wont show someone else wifi password", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        If IsConnectedToWifi() Then
+            Try
+                Dim selectedProfile As String = ExtractSSID()
+                Dim selectedAuth As String = GetAuthenticationType(selectedProfile)
+                Dim password As String = ExtractPassword(selectedProfile)
+                Dim data As String = "WIFI:S:" & selectedProfile & ";T:" & selectedAuth & ";P:" & password & ";;"
+                Dim qrGenerator As QRCodeGenerator = New QRCodeGenerator()
+                Dim qrCodeData As QRCodeData = qrGenerator.CreateQrCode(data, QRCodeGenerator.ECCLevel.L)
+                Dim qrCode As QRCode = New QRCode(qrCodeData)
+                Dim qrCodeImage As Bitmap = qrCode.GetGraphic(8)
 
-    Sub PopulateProfileList()
-        ' Run the netsh command and capture the output
-        Dim output As String = RunNetshCommand("wlan show profiles")
+                PictureBox1.SizeMode = PictureBoxSizeMode.CenterImage
+                PictureBox1.Image = qrCodeImage
 
-        ' Extract profile names using regular expression
-        Dim profileNames As List(Of String) = ExtractProfileNames(output)
-
-        ' Populate ListBox with profile names
-        ComboBox1.Items.AddRange(profileNames.ToArray())
+                ' Display the password in TextBox1
+                TextBox1.Text = password
+                TextBox2.Text = selectedProfile
+            Catch ex As Exception
+                MessageBox.Show("An error occurred: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        Else
+            MessageBox.Show("You are not connected to a WiFi network.")
+        End If
     End Sub
 
     Function RunNetshCommand(command As String) As String
@@ -33,7 +57,7 @@ Public Class Form1
         Return output
     End Function
 
-    Function ExtractProfileNames(output As String) As List(Of String)
+    Private Function ExtractProfileNames(output As String) As List(Of String)
         Dim profileNames As New List(Of String)
 
         ' Use a regular expression to match profile names
@@ -51,48 +75,54 @@ Public Class Form1
         Return profileNames
     End Function
 
-    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
-        CheckKey()
-    End Sub
-
-    Sub CheckKey()
-        Try
-            ' Get the selected profile name from ComboBox
-            If ComboBox1.SelectedItem IsNot Nothing Then
-                Dim selectedProfile As String = ComboBox1.SelectedItem.ToString().Trim()
-                Dim output As String = RunNetshCommand("wlan show profiles """ & selectedProfile & """ key=clear")
-
-                ' Extract password using regular expression
-                Dim password As String = ExtractPassword(output)
-
-                ' Display the password in TextBox1
-                TextBox1.Text = password
-            Else
-                MessageBox.Show("Please select a profile before checking the key.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End If
-        Catch ex As Exception
-            MessageBox.Show("An error occurred: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-
-    Function RunKeyCommand(command As String) As String
-        Dim processInfo As New ProcessStartInfo("netsh", command)
-        processInfo.RedirectStandardOutput = True
-        processInfo.UseShellExecute = False
-        processInfo.CreateNoWindow = True
-
-        Dim process As New Process()
-        process.StartInfo = processInfo
-        process.Start()
-
-        Dim output As String = process.StandardOutput.ReadToEnd()
-        process.WaitForExit()
-
-        Return output
-    End Function
-    Function ExtractPassword(output As String) As String
+    Private Function ExtractSSID() As String
+        Dim output As String = RunNetshCommand("wlan show interfaces")
         ' Use a regular expression to match the Key Content line
+        Dim regexSSID As New Regex("SSID\s+:\s+(.+)", RegexOptions.IgnoreCase)
+        Dim matchSSID As Match = regexSSID.Match(output)
+
+        ' Check if there is a match
+        If matchSSID.Success Then
+            ' Check if the matched group contains the password
+            If matchSSID.Groups.Count > 1 Then
+                ' Return the password
+                Return matchSSID.Groups(1).Value.Trim()
+            Else
+                ' Return a message indicating that the password was found but the group is missing
+                Return "Password found, but group missing"
+            End If
+        Else
+            ' Return a message indicating that the password was not found
+            Return "Password not found"
+        End If
+    End Function
+
+    Private Function GetAuthenticationType(ssid As String) As String
+        Dim output As String = RunNetshCommand("wlan show interfaces")
+
+        ' Use regular expressions to find the authentication type
+        Dim regex As New Regex("Authentication\s+:\s+(.+)", RegexOptions.IgnoreCase)
+        Dim match As Match = regex.Match(output)
+
+        If match.Success Then
+            Dim authenticationType As String = match.Groups(1).Value.Trim()
+
+            ' Determine the simplified authentication type
+            If authenticationType.Contains("WPA") Then
+                Return "WPA"
+            ElseIf authenticationType.Contains("WEP") Then
+                Return "WEP"
+            Else
+                Return "None"
+            End If
+        Else
+            ' Return "Unknown" if authentication information is not found
+            Return "Unknown"
+        End If
+    End Function
+    Private Function ExtractPassword(ssid As String) As String
+        ' Use a regular expression to match the Key Content line
+        Dim output As String = RunNetshCommand("wlan show profiles """ & ssid & """ key=clear")
         Dim regex As New Regex("Key Content\s+:\s+(.+)", RegexOptions.IgnoreCase)
         Dim match As Match = regex.Match(output)
 
@@ -119,10 +149,10 @@ Public Class Form1
             Clipboard.SetText(TextBox1.Text)
 
             ' Optionally, provide feedback to the user
-            MessageBox.Show("Password copied to clipboard!", "App Made by NikGG", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show("Password copied to clipboard!", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
         Else
             ' Notify the user if TextBox1 is empty
-            MessageBox.Show("TextBox is empty. Nothing to copy.", "App Made by NikGG", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show("TextBox is empty. Nothing to copy.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Warning)
         End If
     End Sub
 

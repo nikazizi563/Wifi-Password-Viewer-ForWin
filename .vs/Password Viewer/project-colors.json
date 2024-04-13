@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "dfcb7891-b9d0-4ad7-b5b1-a2cbd921f808": {
+      "ProjectGuid": "dfcb7891-b9d0-4ad7-b5b1-a2cbd921f808",
+      "DisplayName": "Password Viewer",
+      "ColorIndex": 0
+    }
+  },
+  "NextColorIndex": 1
+}

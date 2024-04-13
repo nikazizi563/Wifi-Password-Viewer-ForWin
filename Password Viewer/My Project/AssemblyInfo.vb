@@ -8,10 +8,10 @@ Imports System.Runtime.InteropServices
 
 ' Review the values of the assembly attributes
 
-<Assembly: AssemblyTitle("Password Viewer")>
-<Assembly: AssemblyDescription("")>
-<Assembly: AssemblyCompany("")>
-<Assembly: AssemblyProduct("Password Viewer")>
+<Assembly: AssemblyTitle("Wifi Password Viewer")>
+<Assembly: AssemblyDescription("display key from your own connected wifi on your computer")>
+<Assembly: AssemblyCompany("nikggtech")>
+<Assembly: AssemblyProduct("GG WIFI Password Viewer")>
 <Assembly: AssemblyCopyright("Copyright ©  2024")>
 <Assembly: AssemblyTrademark("")>
 
@@ -32,4 +32,4 @@ Imports System.Runtime.InteropServices
 ' <Assembly: AssemblyVersion("1.0.*")>
 
 <Assembly: AssemblyVersion("1.0.0.0")>
-<Assembly: AssemblyFileVersion("1.0.0.0")>
+<Assembly: AssemblyFileVersion("2.0.0.0")>
